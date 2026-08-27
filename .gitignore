@@ -3,3 +3,5 @@ dist/
 *.db
 .env
 server/*.sqlite
+vestin.db*
+*.db-*
