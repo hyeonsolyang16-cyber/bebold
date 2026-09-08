@@ -21,22 +21,24 @@ export default function Search() {
 
   useEffect(() => {
     let cancelled = false;
-    async function loadCategory() {
-      setCategoryLoading(true);
+    async function loadCategory({ showSpinner } = { showSpinner: true }) {
+      if (showSpinner) setCategoryLoading(true);
       try {
         const data = await api.get(`/stocks/categories/${category}`);
         if (cancelled) return;
         setCategoryItems(data.items || []);
       } catch (err) {
         console.error(err);
-        if (!cancelled) setCategoryItems([]);
+        if (!cancelled && showSpinner) setCategoryItems([]);
       } finally {
         if (!cancelled) setCategoryLoading(false);
       }
     }
-    loadCategory();
+    loadCategory({ showSpinner: true });
+    const interval = setInterval(() => loadCategory({ showSpinner: false }), 4000);
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
   }, [category]);
 

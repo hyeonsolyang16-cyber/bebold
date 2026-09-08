@@ -87,7 +87,7 @@
   cursor: pointer;
   transition: background-color 0.12s ease;
 }
-.stock-card:active { background-color: rgba(20, 20, 30, 0.03); }
+.stock-card:active { background-color: rgba(255, 255, 255, 0.05); }
 .stock-card:last-child { border-bottom: none; }
 
 .stock-avatar {

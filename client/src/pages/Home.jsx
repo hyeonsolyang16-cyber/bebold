@@ -48,8 +48,12 @@ export default function Home() {
       }
     }
 
+    let tick = 0;
     loadOnce({ withExtras: true });
-    const interval = setInterval(() => loadOnce({ withExtras: false }), POLL_MS);
+    const interval = setInterval(() => {
+      tick += 1;
+      loadOnce({ withExtras: tick % 4 === 0 });
+    }, POLL_MS);
     return () => {
       cancelled = true;
       clearInterval(interval);

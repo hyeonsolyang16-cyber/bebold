@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 function formatPrice(price, currency) {
@@ -9,8 +10,27 @@ function formatPrice(price, currency) {
 export default function StockCard({ symbol, name, price, changePercent, currency, mock, starred, onToggleStar }) {
   const navigate = useNavigate();
   const up = (changePercent ?? 0) >= 0;
+  const prevPriceRef = useRef(price);
+  const [flash, setFlash] = useState(null); // 'up' | 'down' | null
+
+  useEffect(() => {
+    const prev = prevPriceRef.current;
+    if (prev != null && price != null && price !== prev) {
+      setFlash(price > prev ? 'up' : 'down');
+      const t = setTimeout(() => setFlash(null), 700);
+      prevPriceRef.current = price;
+      return () => clearTimeout(t);
+    }
+    prevPriceRef.current = price;
+    return undefined;
+  }, [price]);
+
   return (
-    <div className="stock-card" onClick={() => navigate(`/stock/${encodeURIComponent(symbol)}`)} role="button">
+    <div
+      className={`stock-card ${flash ? `price-flash-${flash}` : ''}`}
+      onClick={() => navigate(`/stock/${encodeURIComponent(symbol)}`)}
+      role="button"
+    >
       {onToggleStar && (
         <button
           type="button"
