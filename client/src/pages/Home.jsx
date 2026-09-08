@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react';
-import { api, getUser, setUser as saveUser } from '../api/client.js';
+import { useEffect, useRef, useState } from 'react';
+import { api } from '../api/client.js';
 import { useAuth } from '../App.jsx';
 import StockCard from '../components/StockCard.jsx';
+import AssetTrendChart from '../components/AssetTrendChart.jsx';
 
 const WATCHLIST = ['005930.KS', '000660.KS', '035420.KS', 'AAPL', 'TSLA'];
+const POLL_MS = 5000;
+const MAX_POINTS = 40;
 
 export default function Home() {
   const { user } = useAuth();
@@ -11,65 +14,87 @@ export default function Home() {
   const [transactions, setTransactions] = useState([]);
   const [watchQuotes, setWatchQuotes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [assetHistory, setAssetHistory] = useState([]);
+  const cashRef = useRef(user?.cash ?? 0);
 
   useEffect(() => {
     let cancelled = false;
-    async function load() {
-      setLoading(true);
+
+    async function loadOnce({ withExtras } = { withExtras: false }) {
       try {
-        const [holdingsRes, txRes, quotes] = await Promise.all([
-          api.get('/trades/holdings'),
-          api.get('/trades/history'),
-          Promise.all(WATCHLIST.map((s) => api.get(`/stocks/quote/${encodeURIComponent(s)}`))),
-        ]);
+        const tasks = [api.get('/trades/holdings')];
+        if (withExtras) {
+          tasks.push(api.get('/trades/history'));
+          tasks.push(Promise.all(WATCHLIST.map((s) => api.get(`/stocks/quote/${encodeURIComponent(s)}`))));
+        }
+        const [holdingsRes, txRes, quotes] = await Promise.all(tasks);
         if (cancelled) return;
+
         setHoldings(holdingsRes.holdings);
-        setTransactions(txRes.transactions.slice(0, 5));
-        setWatchQuotes(quotes);
+        if (txRes) setTransactions(txRes.transactions.slice(0, 5));
+        if (quotes) setWatchQuotes(quotes);
+
+        const holdingsValue = holdingsRes.holdings.reduce((sum, h) => sum + h.marketValue, 0);
+        const totalNow = cashRef.current + holdingsValue;
+        setAssetHistory((prev) => {
+          const next = [...prev, { t: Date.now(), value: totalNow }];
+          return next.slice(-MAX_POINTS);
+        });
       } catch (err) {
         console.error(err);
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
-    load();
+
+    loadOnce({ withExtras: true });
+    const interval = setInterval(() => loadOnce({ withExtras: false }), POLL_MS);
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
   }, []);
 
   const holdingsValue = holdings.reduce((sum, h) => sum + h.marketValue, 0);
   const cash = user?.cash ?? 0;
+  cashRef.current = cash;
   const initialCapital = user?.initialCapital ?? 10000000;
   const totalAssets = cash + holdingsValue;
   const returnPct = ((totalAssets / initialCapital) - 1) * 100;
+  const returnUp = returnPct >= 0;
   const todayPnl = holdings.reduce((sum, h) => sum + h.unrealizedPnl, 0);
 
   return (
     <div>
       <div className="page-title">안녕하세요, {user?.nickname}님</div>
 
-      <div className="summary-card">
-        <div className="label">총 자산</div>
-        <div className="total">{Math.round(totalAssets).toLocaleString()}원</div>
-        <div className="stats">
-          <div>
-            수익률
-            <span className={`value ${returnPct >= 0 ? '' : ''}`}>
-              {returnPct >= 0 ? '+' : ''}
-              {returnPct.toFixed(2)}%
-            </span>
+      <div className="asset-card">
+        <div className="asset-card-top">
+          <div className="asset-label">총 자산</div>
+          <span className="live-dot" aria-hidden="true" />
+          <span className="live-label">실시간</span>
+        </div>
+        <div className="asset-total">{Math.round(totalAssets).toLocaleString()}원</div>
+        <div className={`asset-change-pill ${returnUp ? 'up' : 'down'}`}>
+          {returnUp ? '▲' : '▼'} {Math.abs(returnPct).toFixed(2)}%
+          <span className="asset-change-amount">
+            {todayPnl >= 0 ? '+' : ''}
+            {Math.round(todayPnl).toLocaleString()}원
+          </span>
+        </div>
+
+        <div className="asset-chart">
+          <AssetTrendChart points={assetHistory} />
+        </div>
+
+        <div className="asset-card-footer">
+          <div className="asset-footer-item">
+            <span className="asset-footer-label">보유현금</span>
+            <span className="asset-footer-value">{Math.round(cash).toLocaleString()}원</span>
           </div>
-          <div>
-            평가손익
-            <span className="value">
-              {todayPnl >= 0 ? '+' : ''}
-              {Math.round(todayPnl).toLocaleString()}원
-            </span>
-          </div>
-          <div>
-            보유현금
-            <span className="value">{Math.round(cash).toLocaleString()}원</span>
+          <div className="asset-footer-item">
+            <span className="asset-footer-label">주식평가금</span>
+            <span className="asset-footer-value">{Math.round(holdingsValue).toLocaleString()}원</span>
           </div>
         </div>
       </div>
@@ -84,6 +109,7 @@ export default function Home() {
             price={q.price}
             changePercent={q.changePercent}
             currency={q.currency}
+            mock={q.mock}
           />
         ))}
       </div>

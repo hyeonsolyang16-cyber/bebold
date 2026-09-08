@@ -1,29 +1,81 @@
-.summary-card {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-  color: #fff;
-  border-radius: var(--radius);
-  padding: 20px;
+.asset-card {
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 22px 20px 18px;
   box-shadow: var(--shadow);
 }
-.summary-card .label {
-  font-size: 13px;
-  opacity: 0.85;
-  margin-bottom: 6px;
+.asset-card-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
 }
-.summary-card .total {
-  font-size: 26px;
+.asset-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #1f9d55;
+  margin-left: 4px;
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+.live-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1f9d55;
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.asset-total {
+  font-size: 30px;
   font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.5px;
   margin-bottom: 10px;
 }
-.summary-card .stats {
-  display: flex;
-  gap: 16px;
+.asset-change-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
-}
-.summary-card .stats span.value {
   font-weight: 700;
-  display: block;
-  margin-top: 2px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-bottom: 14px;
+}
+.asset-change-pill.up { color: var(--up); background: var(--up-bg); }
+.asset-change-pill.down { color: var(--down); background: var(--down-bg); }
+.asset-change-amount { font-weight: 600; opacity: 0.85; }
+
+.asset-chart {
+  margin: 4px 0 16px;
+}
+
+.asset-card-footer {
+  display: flex;
+  gap: 24px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.asset-footer-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.asset-footer-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.asset-footer-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
 }
 
 .stock-card {
