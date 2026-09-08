@@ -112,6 +112,15 @@ function nameForSymbol(symbol) {
   return NAME_FALLBACKS[symbol] || symbol;
 }
 
+const POPULAR_SET = new Set(POPULAR.map((s) => s.symbol));
+
+// Prefer our curated Korean name for known symbols; only fall back to Yahoo's
+// (usually English) longName/shortName for symbols we haven't mapped.
+function resolveDisplayName(symbol, meta) {
+  if (POPULAR_SET.has(symbol)) return nameForSymbol(symbol);
+  return meta?.longName || meta?.shortName || nameForSymbol(symbol);
+}
+
 // deterministic-ish seed from symbol string
 function seedFromSymbol(symbol) {
   let h = 0;
@@ -270,7 +279,9 @@ router.get('/search', async (req, res) => {
       .filter((item) => item.symbol)
       .map((item) => ({
         symbol: item.symbol,
-        name: item.shortname || item.longname || item.symbol,
+        name: POPULAR_SET.has(item.symbol)
+          ? nameForSymbol(item.symbol)
+          : item.shortname || item.longname || item.symbol,
         exchange: item.exchange,
         type: item.quoteType,
       }));
@@ -340,7 +351,7 @@ router.get('/quote/:symbol', async (req, res) => {
     const changePercent = prevClose ? (change / prevClose) * 100 : 0;
     const payload = {
       symbol,
-      name: meta.longName || meta.shortName || nameForSymbol(symbol),
+      name: resolveDisplayName(symbol, meta),
       price: round2(price),
       prevClose: round2(prevClose),
       change: round2(change),
@@ -415,7 +426,7 @@ async function getQuote(symbol) {
     const changePercent = prevClose ? (change / prevClose) * 100 : 0;
     const payload = {
       symbol,
-      name: meta.longName || meta.shortName || nameForSymbol(symbol),
+      name: resolveDisplayName(symbol, meta),
       price: round2(price),
       prevClose: round2(prevClose),
       change: round2(change),
