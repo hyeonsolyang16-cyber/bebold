@@ -195,7 +195,7 @@ router.get('/quote/:symbol', async (req, res) => {
     const changePercent = prevClose ? (change / prevClose) * 100 : 0;
     const payload = {
       symbol,
-      name: meta.symbol,
+      name: meta.longName || meta.shortName || nameForSymbol(symbol),
       price: round2(price),
       prevClose: round2(prevClose),
       change: round2(change),
@@ -267,7 +267,7 @@ async function getQuote(symbol) {
     const changePercent = prevClose ? (change / prevClose) * 100 : 0;
     const payload = {
       symbol,
-      name: meta.symbol,
+      name: meta.longName || meta.shortName || nameForSymbol(symbol),
       price: round2(price),
       prevClose: round2(prevClose),
       change: round2(change),

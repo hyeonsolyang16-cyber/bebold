@@ -29,17 +29,65 @@
 .stock-card {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
   padding: 14px 4px;
   border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background-color 0.12s ease;
 }
+.stock-card:active { background-color: rgba(20, 20, 30, 0.03); }
 .stock-card:last-child { border-bottom: none; }
-.stock-card .info { display: flex; flex-direction: column; gap: 3px; }
-.stock-card .symbol-name { font-weight: 700; font-size: 15px; }
-.stock-card .symbol-code { font-size: 12px; color: var(--text-muted); }
-.stock-card .price-block { text-align: right; }
-.stock-card .price { font-weight: 700; font-size: 15px; }
-.stock-card .change { font-size: 12px; margin-top: 2px; }
+
+.stock-avatar {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--down-bg);
+  color: var(--primary);
+  font-weight: 800;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stock-card .info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.stock-card .symbol-name {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stock-card .symbol-code {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.stock-card .price-block { flex-shrink: 0; text-align: right; }
+.stock-card .price { font-weight: 700; font-size: 16px; color: var(--text); }
+.change-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 4px;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+.change-pill.up { color: var(--up); background: var(--up-bg); }
+.change-pill.down { color: var(--down); background: var(--down-bg); }
 
 .holding-row {
   padding: 14px 4px;
