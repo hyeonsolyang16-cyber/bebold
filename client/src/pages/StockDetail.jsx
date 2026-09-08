@@ -18,7 +18,7 @@ export default function StockDetail() {
   const { user, setUser } = useAuth();
   const [quote, setQuote] = useState(null);
   const [history, setHistory] = useState(null);
-  const [range, setRange] = useState('3mo');
+  const [range, setRange] = useState('today');
   const [qty, setQty] = useState('');
   const [side, setSide] = useState('BUY');
   const [orderType, setOrderType] = useState('MARKET');

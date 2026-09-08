@@ -302,6 +302,30 @@ router.get('/search', async (req, res) => {
   }
 });
 
+const ALL_TRACKED_SYMBOLS = POPULAR.map((s) => s.symbol);
+
+// Yahoo's unofficial predefined screener — the same endpoint the Yahoo Finance
+// website itself uses for its real-time "Day Gainers/Losers" pages. Gives us
+// genuine whole-market movers (mostly US-listed) rather than just our curated list.
+async function fetchScreener(scrId, count = 25) {
+  const url = `https://query2.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&count=${count}&scrIds=${scrId}`;
+  const data = await fetchWithTimeout(url, 4000);
+  const quotes = data?.finance?.result?.[0]?.quotes || [];
+  return quotes
+    .filter((q) => q.symbol && q.regularMarketPrice != null)
+    .map((q) => ({
+      symbol: q.symbol,
+      name: resolveDisplayName(q.symbol, { longName: q.longName, shortName: q.shortName }),
+      price: round2(q.regularMarketPrice),
+      prevClose: round2(q.regularMarketPreviousClose ?? q.regularMarketPrice - (q.regularMarketChange || 0)),
+      change: round2(q.regularMarketChange ?? 0),
+      changePercent: round2(q.regularMarketChangePercent ?? 0),
+      currency: q.currency || 'USD',
+      marketState: q.marketState,
+      mock: false,
+    }));
+}
+
 router.get('/categories/:key', async (req, res) => {
   const { key } = req.params;
   const symbols = CATEGORY_SYMBOLS[key];
@@ -313,18 +337,34 @@ router.get('/categories/:key', async (req, res) => {
   if (cached) return res.json(cached);
 
   try {
-    const items = await Promise.all(
-      symbols.map(async (symbol) => {
-        const quote = await getQuote(symbol);
-        return quote;
-      })
-    );
-    if (key === 'gainers') {
-      items.sort((a, b) => b.changePercent - a.changePercent);
-    } else if (key === 'losers') {
-      items.sort((a, b) => a.changePercent - b.changePercent);
+    let items;
+    if (key === 'gainers' || key === 'losers') {
+      // Compute real-time gainers/losers dynamically across every symbol we
+      // track (not a hardcoded subset), and try to broaden with Yahoo's live
+      // market-wide screener on top of that.
+      const trackedQuotes = await Promise.all(ALL_TRACKED_SYMBOLS.map((symbol) => getQuote(symbol)));
+      let combined = trackedQuotes;
+      try {
+        const screenerId = key === 'gainers' ? 'day_gainers' : 'day_losers';
+        const screenerQuotes = await fetchScreener(screenerId, 25);
+        const seen = new Set(combined.map((q) => q.symbol));
+        for (const q of screenerQuotes) {
+          if (!seen.has(q.symbol)) {
+            combined.push(q);
+            seen.add(q.symbol);
+          }
+        }
+      } catch (screenerErr) {
+        // Screener endpoint can be blocked/rate-limited; fall back to tracked-only.
+      }
+      items = combined
+        .filter((q) => Number.isFinite(q.changePercent))
+        .sort((a, b) => (key === 'gainers' ? b.changePercent - a.changePercent : a.changePercent - b.changePercent))
+        .slice(0, 20);
+    } else {
+      items = await Promise.all(symbols.map((symbol) => getQuote(symbol)));
     }
-    const payload = { key, items };
+    const payload = { key, items, realtime: key === 'gainers' || key === 'losers' };
     setCache(cacheKey, payload);
     res.json(payload);
   } catch (err) {
