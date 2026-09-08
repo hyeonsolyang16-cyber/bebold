@@ -31,7 +31,7 @@ export default function Signup() {
 
   return (
     <div className="center-page">
-      <div className="brand-title">비볼드</div>
+      <img src="/logo.png" alt="비볼드" className="brand-logo" />
       <div className="brand-sub">가입 즉시 1,000만원의 모의투자금이 지급됩니다</div>
       <form className="card" onSubmit={handleSubmit}>
         <div className="form-group">

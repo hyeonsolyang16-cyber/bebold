@@ -30,7 +30,7 @@ export default function Login() {
 
   return (
     <div className="center-page">
-      <div className="brand-title">비볼드</div>
+      <img src="/logo.png" alt="비볼드" className="brand-logo" />
       <div className="brand-sub">주식 모의투자로 실력을 키워보세요</div>
       <form className="card" onSubmit={handleSubmit}>
         <div className="form-group">

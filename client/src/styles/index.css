@@ -163,6 +163,13 @@ button {
   margin-bottom: 4px;
   color: var(--primary);
 }
+.brand-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  margin-bottom: 12px;
+  object-fit: cover;
+}
 .brand-sub {
   color: var(--text-muted);
   font-size: 14px;
