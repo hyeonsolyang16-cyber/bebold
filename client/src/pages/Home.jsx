@@ -3,6 +3,7 @@ import { api } from '../api/client.js';
 import { useAuth } from '../App.jsx';
 import StockCard from '../components/StockCard.jsx';
 import AssetTrendChart from '../components/AssetTrendChart.jsx';
+import useSmoothValue from '../hooks/useSmoothValue.js';
 
 const WATCHLIST = ['005930.KS', '000660.KS', '035420.KS', 'AAPL', 'TSLA'];
 const POLL_MS = 1000;
@@ -63,6 +64,7 @@ export default function Home() {
   const returnPct = ((totalAssets / initialCapital) - 1) * 100;
   const returnUp = returnPct >= 0;
   const todayPnl = holdings.reduce((sum, h) => sum + h.unrealizedPnl, 0);
+  const smoothTotalAssets = useSmoothValue(totalAssets);
 
   return (
     <div>
@@ -74,7 +76,7 @@ export default function Home() {
           <span className="live-dot" aria-hidden="true" />
           <span className="live-label">실시간</span>
         </div>
-        <div className="asset-total">{Math.round(totalAssets).toLocaleString()}원</div>
+        <div className="asset-total">{Math.round(smoothTotalAssets).toLocaleString()}원</div>
         <div className={`asset-change-pill ${returnUp ? 'up' : 'down'}`}>
           {returnUp ? '▲' : '▼'} {Math.abs(returnPct).toFixed(2)}%
           <span className="asset-change-amount">
