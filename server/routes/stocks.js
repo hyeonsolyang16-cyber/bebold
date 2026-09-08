@@ -14,22 +14,102 @@ function setCache(key, data) {
   cache.set(key, { data, expires: Date.now() + CACHE_TTL });
 }
 
+// 코스피/코스닥 대형주 + 미국 대형주. 한국 종목은 정확한 한글 종목명을 병기하고,
+// 미국 종목은 "한글명 (영문명)" 형태로 병기해 일관성을 유지한다.
 const POPULAR = [
+  // 코스피 대형주
   { symbol: '005930.KS', name: '삼성전자' },
   { symbol: '000660.KS', name: 'SK하이닉스' },
+  { symbol: '373220.KS', name: 'LG에너지솔루션' },
+  { symbol: '207940.KS', name: '삼성바이오로직스' },
+  { symbol: '005935.KS', name: '삼성전자우' },
+  { symbol: '005380.KS', name: '현대차' },
+  { symbol: '000270.KS', name: '기아' },
   { symbol: '035420.KS', name: 'NAVER' },
   { symbol: '035720.KS', name: '카카오' },
-  { symbol: '005380.KS', name: '현대차' },
-  { symbol: 'AAPL', name: 'Apple Inc.' },
-  { symbol: 'TSLA', name: 'Tesla, Inc.' },
-  { symbol: 'MSFT', name: 'Microsoft Corp.' },
-  { symbol: 'NVDA', name: 'NVIDIA Corp.' },
-  { symbol: 'GOOGL', name: 'Alphabet Inc.' },
+  { symbol: '051910.KS', name: 'LG화학' },
+  { symbol: '006400.KS', name: '삼성SDI' },
+  { symbol: '105560.KS', name: 'KB금융' },
+  { symbol: '055550.KS', name: '신한지주' },
+  { symbol: '012330.KS', name: '현대모비스' },
+  { symbol: '028260.KS', name: '삼성물산' },
+  { symbol: '068270.KS', name: '셀트리온' },
+  { symbol: '096770.KS', name: 'SK이노베이션' },
+  { symbol: '066570.KS', name: 'LG전자' },
+  { symbol: '003670.KS', name: '포스코퓨처엠' },
+  { symbol: '015760.KS', name: '한국전력' },
+  { symbol: '032830.KS', name: '삼성생명' },
+  { symbol: '086790.KS', name: '하나금융지주' },
+  { symbol: '011200.KS', name: 'HMM' },
+  { symbol: '009150.KS', name: '삼성전기' },
+  { symbol: '018260.KS', name: '삼성에스디에스' },
+  // 코스닥 주요주
+  { symbol: '247540.KQ', name: '에코프로비엠' },
+  { symbol: '086520.KQ', name: '에코프로' },
+  { symbol: '091990.KQ', name: '셀트리온헬스케어' },
+  { symbol: '328130.KQ', name: '루닛' },
+  { symbol: '196170.KQ', name: '알테오젠' },
+  { symbol: '028300.KQ', name: 'HLB' },
+  { symbol: '066970.KQ', name: '엘앤에프' },
+  { symbol: '293490.KQ', name: '카카오게임즈' },
+  { symbol: '041510.KQ', name: 'SM' },
+  { symbol: '112040.KQ', name: '위메이드' },
+  // 미국 대형주
+  { symbol: 'AAPL', name: '애플 (Apple)' },
+  { symbol: 'TSLA', name: '테슬라 (Tesla)' },
+  { symbol: 'MSFT', name: '마이크로소프트 (Microsoft)' },
+  { symbol: 'NVDA', name: '엔비디아 (NVIDIA)' },
+  { symbol: 'GOOGL', name: '알파벳 (Alphabet)' },
+  { symbol: 'AMZN', name: '아마존 (Amazon)' },
+  { symbol: 'META', name: '메타 플랫폼스 (Meta)' },
+  { symbol: 'NFLX', name: '넷플릭스 (Netflix)' },
+  { symbol: 'AMD', name: 'AMD' },
+  { symbol: 'AVGO', name: '브로드컴 (Broadcom)' },
+  { symbol: 'COST', name: '코스트코 (Costco)' },
+  { symbol: 'JPM', name: 'JP모건체이스 (JPMorgan Chase)' },
+  { symbol: 'V', name: '비자 (Visa)' },
+  { symbol: 'DIS', name: '월트디즈니 (Walt Disney)' },
+  { symbol: 'BA', name: '보잉 (Boeing)' },
 ];
+
+// 카테고리별 큐레이션 목록 (실시간 거래대금/시가총액 순위 API가 없어 대표 종목으로 대체)
+const CATEGORY_SYMBOLS = {
+  volume: [
+    '005930.KS', '000660.KS', '035720.KS', '035420.KS', '005380.KS',
+    '247540.KQ', '086520.KQ', 'TSLA', 'AAPL', 'NVDA',
+    '068270.KS', '051910.KS', '011200.KS', '028300.KQ', '293490.KQ',
+    'AMD', 'AMZN', 'META', '066570.KS', '096770.KS',
+  ],
+  marketcap: [
+    '005930.KS', '000660.KS', '373220.KS', '207940.KS', '035420.KS',
+    'AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN',
+    '005380.KS', '051910.KS', '006400.KS', '105560.KS', '055550.KS',
+    'META', 'AVGO', 'TSLA', 'V', 'JPM',
+  ],
+  popular: [
+    '005930.KS', '035720.KS', '000660.KS', 'TSLA', 'AAPL',
+    '035420.KS', '247540.KQ', 'NVDA', '005380.KS', '086520.KQ',
+    '068270.KS', '028300.KQ', 'GOOGL', 'MSFT', 'AMZN',
+    '293490.KQ', '196170.KQ', 'META', '000270.KS', '112040.KQ',
+  ],
+  gainers: [
+    '247540.KQ', '086520.KQ', '328130.KQ', '196170.KQ', '028300.KQ',
+    '066970.KQ', 'NVDA', 'AMD', 'TSLA', '041510.KQ',
+  ],
+  losers: [
+    '011200.KS', '096770.KS', '015760.KS', '018260.KS',
+    'DIS', 'BA', '032830.KS', '086790.KS', '112040.KQ', '066970.KQ',
+  ],
+};
+
+const NAME_FALLBACKS = {
+  // Yahoo search 결과에 한글명이 없는 경우를 위한 보강 매핑 (POPULAR와 중복되어도 무방)
+};
 
 function nameForSymbol(symbol) {
   const found = POPULAR.find((s) => s.symbol === symbol);
-  return found ? found.name : symbol;
+  if (found) return found.name;
+  return NAME_FALLBACKS[symbol] || symbol;
 }
 
 // deterministic-ish seed from symbol string
@@ -80,12 +160,46 @@ function mockQuote(symbol) {
   };
 }
 
+const INTRADAY_MINUTES = {
+  '1m': 1,
+  '5m': 5,
+  '15m': 15,
+  '30m': 30,
+  '60m': 60,
+};
+
 function mockHistory(symbol, range, interval) {
-  const days = rangeToDays(range);
   const rand = mulberry32(seedFromSymbol(symbol));
   let price = basePriceForSymbol(symbol) * 0.9;
   const candles = [];
   const now = Date.now();
+
+  // Intraday (오늘/실시간) mock: dense minute-level candles across the trading day so far.
+  if (range === '1d' && INTRADAY_MINUTES[interval]) {
+    const stepMs = INTRADAY_MINUTES[interval] * 60 * 1000;
+    const points = Math.max(1, Math.floor((6.5 * 60 * 60 * 1000) / stepMs)); // ~6.5h session
+    price = basePriceForSymbol(symbol) * (0.99 + rand() * 0.02);
+    for (let i = points; i >= 0; i--) {
+      const drift = (rand() - 0.49) * 0.006;
+      const open = price;
+      price = Math.max(1, price * (1 + drift));
+      const close = price;
+      const high = Math.max(open, close) * (1 + rand() * 0.003);
+      const low = Math.min(open, close) * (1 - rand() * 0.003);
+      const ts = new Date(now - i * stepMs);
+      candles.push({
+        date: ts.toISOString(),
+        open: round2(open),
+        high: round2(high),
+        low: round2(low),
+        close: round2(close),
+        volume: Math.floor(rand() * 50000),
+      });
+    }
+    return { symbol, range, interval, candles, mock: true };
+  }
+
+  const days = rangeToDays(range);
   const dayMs = 24 * 60 * 60 * 1000;
   for (let i = days; i >= 0; i--) {
     const drift = (rand() - 0.48) * 0.02;
@@ -177,6 +291,37 @@ router.get('/search', async (req, res) => {
   }
 });
 
+router.get('/categories/:key', async (req, res) => {
+  const { key } = req.params;
+  const symbols = CATEGORY_SYMBOLS[key];
+  if (!symbols) {
+    return res.status(404).json({ error: '알 수 없는 카테고리입니다.' });
+  }
+  const cacheKey = `category:${key}`;
+  const cached = getCache(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    const items = await Promise.all(
+      symbols.map(async (symbol) => {
+        const quote = await getQuote(symbol);
+        return quote;
+      })
+    );
+    if (key === 'gainers') {
+      items.sort((a, b) => b.changePercent - a.changePercent);
+    } else if (key === 'losers') {
+      items.sort((a, b) => a.changePercent - b.changePercent);
+    }
+    const payload = { key, items };
+    setCache(cacheKey, payload);
+    res.json(payload);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '카테고리 조회 중 오류가 발생했습니다.' });
+  }
+});
+
 router.get('/quote/:symbol', async (req, res) => {
   const { symbol } = req.params;
   const cacheKey = `quote:${symbol}`;
@@ -230,8 +375,11 @@ router.get('/history/:symbol', async (req, res) => {
     if (!result) throw new Error('no result');
     const timestamps = result.timestamp || [];
     const quote = result.indicators.quote[0];
+    const isIntraday = !!INTRADAY_MINUTES[interval];
     const candles = timestamps.map((ts, i) => ({
-      date: new Date(ts * 1000).toISOString().slice(0, 10),
+      date: isIntraday
+        ? new Date(ts * 1000).toISOString()
+        : new Date(ts * 1000).toISOString().slice(0, 10),
       open: quote.open[i] != null ? round2(quote.open[i]) : null,
       high: quote.high[i] != null ? round2(quote.high[i]) : null,
       low: quote.low[i] != null ? round2(quote.low[i]) : null,
@@ -285,4 +433,4 @@ async function getQuote(symbol) {
   }
 }
 
-module.exports = { router, mockQuote, POPULAR, getQuote };
+module.exports = { router, mockQuote, POPULAR, getQuote, CATEGORY_SYMBOLS };

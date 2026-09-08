@@ -2,17 +2,12 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client.js';
 import StockCard from '../components/StockCard.jsx';
 
-const POPULAR = [
-  { symbol: '005930.KS', name: '삼성전자' },
-  { symbol: '000660.KS', name: 'SK하이닉스' },
-  { symbol: '035420.KS', name: 'NAVER' },
-  { symbol: '035720.KS', name: '카카오' },
-  { symbol: '005380.KS', name: '현대차' },
-  { symbol: 'AAPL', name: 'Apple Inc.' },
-  { symbol: 'TSLA', name: 'Tesla, Inc.' },
-  { symbol: 'MSFT', name: 'Microsoft Corp.' },
-  { symbol: 'NVDA', name: 'NVIDIA Corp.' },
-  { symbol: 'GOOGL', name: 'Alphabet Inc.' },
+const CATEGORIES = [
+  { key: 'popular', label: '인기' },
+  { key: 'volume', label: '거래대금' },
+  { key: 'marketcap', label: '시가총액' },
+  { key: 'gainers', label: '급등' },
+  { key: 'losers', label: '급락' },
 ];
 
 export default function Search() {
@@ -20,25 +15,30 @@ export default function Search() {
   const [results, setResults] = useState(null);
   const [quotes, setQuotes] = useState({});
   const [loading, setLoading] = useState(false);
+  const [category, setCategory] = useState('popular');
+  const [categoryItems, setCategoryItems] = useState([]);
+  const [categoryLoading, setCategoryLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    async function loadPopularQuotes() {
-      const list = await Promise.all(
-        POPULAR.map((s) => api.get(`/stocks/quote/${encodeURIComponent(s.symbol)}`).catch(() => null))
-      );
-      if (cancelled) return;
-      const map = {};
-      list.forEach((q) => {
-        if (q) map[q.symbol] = q;
-      });
-      setQuotes(map);
+    async function loadCategory() {
+      setCategoryLoading(true);
+      try {
+        const data = await api.get(`/stocks/categories/${category}`);
+        if (cancelled) return;
+        setCategoryItems(data.items || []);
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) setCategoryItems([]);
+      } finally {
+        if (!cancelled) setCategoryLoading(false);
+      }
     }
-    loadPopularQuotes();
+    loadCategory();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [category]);
 
   useEffect(() => {
     if (!query.trim()) {
@@ -73,7 +73,7 @@ export default function Search() {
     };
   }, [query]);
 
-  const listToShow = results ?? POPULAR;
+  const showingSearch = !!results;
 
   return (
     <div>
@@ -85,26 +85,67 @@ export default function Search() {
         onChange={(e) => setQuery(e.target.value)}
       />
 
-      <div className="section-title">{results ? '검색 결과' : '인기 종목'}</div>
+      {!showingSearch && (
+        <div className="row" style={{ gap: 6, marginTop: 12, overflowX: 'auto' }}>
+          {CATEGORIES.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              className={`btn ${category === c.key ? 'btn-primary' : 'btn-outline'}`}
+              style={{ padding: '6px 12px', fontSize: 13, whiteSpace: 'nowrap' }}
+              onClick={() => setCategory(c.key)}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="section-title">
+        {showingSearch ? '검색 결과' : CATEGORIES.find((c) => c.key === category)?.label + ' 종목'}
+      </div>
       <div className="card" style={{ padding: '4px 12px' }}>
-        {loading && <div className="spinner-wrap">검색 중...</div>}
-        {!loading && listToShow.length === 0 && (
-          <div className="muted" style={{ padding: '14px 4px' }}>검색 결과가 없습니다.</div>
+        {showingSearch ? (
+          <>
+            {loading && <div className="spinner-wrap">검색 중...</div>}
+            {!loading && results.length === 0 && (
+              <div className="muted" style={{ padding: '14px 4px' }}>검색 결과가 없습니다.</div>
+            )}
+            {!loading &&
+              results.map((item) => {
+                const q = quotes[item.symbol];
+                return (
+                  <StockCard
+                    key={item.symbol}
+                    symbol={item.symbol}
+                    name={item.name}
+                    price={q?.price}
+                    changePercent={q?.changePercent}
+                    currency={q?.currency}
+                  />
+                );
+              })}
+          </>
+        ) : (
+          <>
+            {categoryLoading && <div className="spinner-wrap">불러오는 중...</div>}
+            {!categoryLoading && categoryItems.length === 0 && (
+              <div className="muted" style={{ padding: '14px 4px' }}>표시할 종목이 없습니다.</div>
+            )}
+            {!categoryLoading &&
+              categoryItems.map((q) => (
+                <StockCard
+                  key={q.symbol}
+                  symbol={q.symbol}
+                  name={q.name}
+                  price={q.price}
+                  changePercent={q.changePercent}
+                  currency={q.currency}
+                  mock={q.mock}
+                />
+              ))}
+          </>
         )}
-        {!loading &&
-          listToShow.map((item) => {
-            const q = quotes[item.symbol];
-            return (
-              <StockCard
-                key={item.symbol}
-                symbol={item.symbol}
-                name={item.name}
-                price={q?.price}
-                changePercent={q?.changePercent}
-                currency={q?.currency}
-              />
-            );
-          })}
       </div>
     </div>
   );
