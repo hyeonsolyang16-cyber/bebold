@@ -5,7 +5,7 @@ import StockCard from '../components/StockCard.jsx';
 import AssetTrendChart from '../components/AssetTrendChart.jsx';
 
 const WATCHLIST = ['005930.KS', '000660.KS', '035420.KS', 'AAPL', 'TSLA'];
-const POLL_MS = 5000;
+const POLL_MS = 1000;
 const MAX_POINTS = 40;
 
 export default function Home() {
