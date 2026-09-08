@@ -12,7 +12,7 @@ export default defineConfig({
         name: '비볼드 - 주식 모의투자',
         short_name: '비볼드',
         description: '한국형 주식 모의투자(페이퍼 트레이딩) 웹앱',
-        theme_color: '#000000',
+        theme_color: '#ffffff',
         background_color: '#f4f5f7',
         display: 'standalone',
         start_url: '/',

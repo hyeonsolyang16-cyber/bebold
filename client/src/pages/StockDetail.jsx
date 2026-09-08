@@ -1,8 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api, setUser as saveUser } from '../api/client.js';
 import { useAuth } from '../App.jsx';
 import CandleChart from '../components/CandleChart.jsx';
+import AssetTrendChart from '../components/AssetTrendChart.jsx';
+
+const QUOTE_POLL_MS = 2000;
+const MAX_LIVE_POINTS = 60;
 
 const RANGES = [
   { key: 'today', label: '오늘', apiRange: '1d', apiInterval: '5m' },
@@ -28,26 +32,48 @@ export default function StockDetail() {
   const [submitting, setSubmitting] = useState(false);
   const [myQty, setMyQty] = useState(0);
   const [pendingOrders, setPendingOrders] = useState([]);
+  const [livePoints, setLivePoints] = useState([]);
+  const [priceFlash, setPriceFlash] = useState(null);
+  const prevPriceRef = useRef(null);
+  const symbolRef = useRef(symbol);
+
+  useEffect(() => {
+    symbolRef.current = symbol;
+    setLivePoints([]);
+    prevPriceRef.current = null;
+  }, [symbol]);
 
   useEffect(() => {
     let cancelled = false;
-    async function load() {
+    async function load({ withHoldings } = { withHoldings: true }) {
       try {
-        const [q, holdingsRes] = await Promise.all([
-          api.get(`/stocks/quote/${encodeURIComponent(symbol)}`),
-          api.get('/trades/holdings'),
-        ]);
-        if (cancelled) return;
+        const tasks = [api.get(`/stocks/quote/${encodeURIComponent(symbol)}`)];
+        if (withHoldings) tasks.push(api.get('/trades/holdings'));
+        const [q, holdingsRes] = await Promise.all(tasks);
+        if (cancelled || symbolRef.current !== symbol) return;
         setQuote(q);
-        const holding = holdingsRes.holdings.find((h) => h.symbol === symbol);
-        setMyQty(holding ? holding.qty : 0);
+        if (holdingsRes) {
+          const holding = holdingsRes.holdings.find((h) => h.symbol === symbol);
+          setMyQty(holding ? holding.qty : 0);
+        }
+        if (q?.price != null) {
+          setLivePoints((prev) => [...prev, { t: Date.now(), value: q.price }].slice(-MAX_LIVE_POINTS));
+          const prevPrice = prevPriceRef.current;
+          if (prevPrice != null && q.price !== prevPrice) {
+            setPriceFlash(q.price > prevPrice ? 'up' : 'down');
+            setTimeout(() => setPriceFlash(null), 700);
+          }
+          prevPriceRef.current = q.price;
+        }
       } catch (err) {
         console.error(err);
       }
     }
-    load();
+    load({ withHoldings: true });
+    const interval = setInterval(() => load({ withHoldings: false }), QUOTE_POLL_MS);
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
   }, [symbol]);
 
@@ -173,7 +199,10 @@ export default function StockDetail() {
       <div className="muted" style={{ marginTop: -12, marginBottom: 12 }}>{quote.symbol}</div>
 
       <div className="card">
-        <div style={{ fontSize: 26, fontWeight: 800 }}>
+        <div
+          className={priceFlash ? `price-flash-${priceFlash}` : ''}
+          style={{ fontSize: 26, fontWeight: 800, borderRadius: 8, display: 'inline-block' }}
+        >
           {isKR ? `${Math.round(quote.price).toLocaleString()}원` : `$${quote.price.toFixed(2)}`}
         </div>
         <div className={up ? 'up' : 'down'} style={{ fontWeight: 700, marginTop: 4 }}>
@@ -197,12 +226,16 @@ export default function StockDetail() {
         {range === 'today' && (
           <div className="row" style={{ alignItems: 'center', gap: 6, marginTop: 10 }}>
             <span className="live-dot" aria-hidden="true" />
-            <span className="live-label">실시간 분봉</span>
+            <span className="live-label">실시간</span>
           </div>
         )}
 
         <div style={{ marginTop: 12 }}>
-          <CandleChart candles={history?.candles} currency={quote.currency} />
+          {range === 'today' ? (
+            <AssetTrendChart points={livePoints} height={160} />
+          ) : (
+            <CandleChart candles={history?.candles} currency={quote.currency} />
+          )}
         </div>
       </div>
 

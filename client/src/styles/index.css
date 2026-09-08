@@ -2,21 +2,21 @@
 @import './cards.css';
 
 :root {
-  --bg: #000000;
-  --surface: #16171b;
-  --surface-2: #1f2024;
-  --border: #2b2c31;
-  --text: #ffffff;
-  --text-muted: #8b8e96;
-  --primary: #3182f6;
-  --primary-dark: #1b64da;
-  --up: #ff4747;      /* Korean convention: red = up */
-  --down: #4a7dff;    /* Korean convention: blue = down */
-  --up-bg: rgba(255, 71, 71, 0.14);
-  --down-bg: rgba(74, 125, 255, 0.14);
-  --radius: 16px;
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --surface-2: #f0f1f3;
+  --border: #e5e7eb;
+  --text: #1a1c1f;
+  --text-muted: #767b83;
+  --primary: #2f6fed;
+  --primary-dark: #1f56c2;
+  --up: #e0342d;      /* Korean convention: red = up */
+  --down: #2b6ef2;    /* Korean convention: blue = down */
+  --up-bg: #fdeceb;
+  --down-bg: #eaf1fe;
+  --radius: 14px;
   --radius-sm: 10px;
-  --shadow: 0 2px 14px rgba(0, 0, 0, 0.4);
+  --shadow: 0 2px 10px rgba(20, 20, 30, 0.06);
   --tabbar-height: 60px;
 }
 
