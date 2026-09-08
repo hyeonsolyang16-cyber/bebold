@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const { router: stocksRoutes } = require('./routes/stocks');
 const tradesRoutes = require('./routes/trades');
 const rankingRoutes = require('./routes/ranking');
+const { startOrderChecker } = require('./jobs/orderChecker');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -36,4 +37,5 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`BeBold server listening on port ${PORT}`);
+  startOrderChecker();
 });

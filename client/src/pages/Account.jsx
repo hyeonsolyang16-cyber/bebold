@@ -9,19 +9,31 @@ export default function Account() {
   const navigate = useNavigate();
   const [holdings, setHoldings] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [pendingOrders, setPendingOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  async function loadPendingOrders() {
+    try {
+      const res = await api.get('/trades/orders/pending');
+      setPendingOrders(res.orders || []);
+    } catch (err) {
+      console.error(err);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const [holdingsRes, txRes] = await Promise.all([
+        const [holdingsRes, txRes, ordersRes] = await Promise.all([
           api.get('/trades/holdings'),
           api.get('/trades/history'),
+          api.get('/trades/orders/pending'),
         ]);
         if (cancelled) return;
         setHoldings(holdingsRes.holdings);
         setTransactions(txRes.transactions);
+        setPendingOrders(ordersRes.orders || []);
       } catch (err) {
         console.error(err);
       } finally {
@@ -33,6 +45,16 @@ export default function Account() {
       cancelled = true;
     };
   }, []);
+
+  async function handleCancelOrder(orderId) {
+    try {
+      const res = await api.post(`/trades/orders/${orderId}/cancel`, {});
+      setUser({ ...user, cash: res.cash });
+      loadPendingOrders();
+    } catch (err) {
+      console.error(err);
+    }
+  }
 
   const holdingsValue = holdings.reduce((sum, h) => sum + h.marketValue, 0);
   const cash = user?.cash ?? 0;
@@ -80,6 +102,31 @@ export default function Account() {
         )}
         {holdings.map((h) => (
           <HoldingRow key={h.symbol} holding={h} />
+        ))}
+      </div>
+
+      <div className="section-title">대기중인 주문</div>
+      <div className="card" style={{ padding: '4px 12px' }}>
+        {!loading && pendingOrders.length === 0 && (
+          <div className="muted" style={{ padding: '14px 4px' }}>대기중인 지정가 주문이 없습니다.</div>
+        )}
+        {pendingOrders.map((o) => (
+          <div className="tx-row" key={o.id}>
+            <div>
+              <span className={`tx-badge ${o.side === 'BUY' ? 'buy' : 'sell'}`}>
+                {o.side === 'BUY' ? '매수' : '매도'}
+              </span>
+              {o.name || o.symbol} · {o.qty}주 @ {Math.round(o.limit_price).toLocaleString()}원
+            </div>
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{ padding: '4px 10px', fontSize: 12 }}
+              onClick={() => handleCancelOrder(o.id)}
+            >
+              취소
+            </button>
+          </div>
         ))}
       </div>
 

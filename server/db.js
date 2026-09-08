@@ -42,6 +42,28 @@ CREATE TABLE IF NOT EXISTS transactions (
   realized_pnl REAL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS pending_orders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  symbol TEXT NOT NULL,
+  name TEXT,
+  side TEXT NOT NULL CHECK(side IN ('BUY','SELL')),
+  order_type TEXT NOT NULL CHECK(order_type IN ('MARKET','LIMIT')) DEFAULT 'LIMIT',
+  qty REAL NOT NULL,
+  limit_price REAL NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('PENDING','FILLED','CANCELLED')) DEFAULT 'PENDING',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  filled_at TEXT,
+  filled_price REAL,
+  avg_price_at_order REAL
+);
 `);
+
+// Lightweight migration for DBs created before avg_price_at_order existed.
+const pendingOrderCols = db.prepare('PRAGMA table_info(pending_orders)').all().map((c) => c.name);
+if (!pendingOrderCols.includes('avg_price_at_order')) {
+  db.exec('ALTER TABLE pending_orders ADD COLUMN avg_price_at_order REAL');
+}
 
 module.exports = { db, INITIAL_CAPITAL };
