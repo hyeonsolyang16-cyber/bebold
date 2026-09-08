@@ -232,7 +232,7 @@ export default function StockDetail() {
 
         <div style={{ marginTop: 12 }}>
           {range === 'today' ? (
-            <AssetTrendChart points={livePoints} height={160} />
+            <AssetTrendChart points={livePoints} height={160} smooth={false} />
           ) : (
             <CandleChart candles={history?.candles} currency={quote.currency} />
           )}

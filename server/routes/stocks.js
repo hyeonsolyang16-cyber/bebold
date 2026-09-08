@@ -114,11 +114,39 @@ function nameForSymbol(symbol) {
 
 const POPULAR_SET = new Set(POPULAR.map((s) => s.symbol));
 
-// Prefer our curated Korean name for known symbols; only fall back to Yahoo's
-// (usually English) longName/shortName for symbols we haven't mapped.
-function resolveDisplayName(symbol, meta) {
+// Cache of English company name -> Korean translation, so we only hit the
+// translation API once per unique name (persists for the process lifetime).
+const translationCache = new Map();
+
+// Very small heuristic: skip translating things that already look Korean,
+// or short all-caps tickers/tokens that a machine translator tends to mangle.
+function looksAlreadyTranslatable(text) {
+  return /[a-zA-Z]/.test(text);
+}
+
+async function translateToKorean(text) {
+  if (!text || !looksAlreadyTranslatable(text)) return text;
+  if (translationCache.has(text)) return translationCache.get(text);
+  try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|ko`;
+    const data = await fetchWithTimeout(url, 2500);
+    const translated = data?.responseData?.translatedText;
+    const result = translated && translated.trim() ? translated.trim() : text;
+    translationCache.set(text, result);
+    return result;
+  } catch (err) {
+    translationCache.set(text, text);
+    return text;
+  }
+}
+
+// Prefer our curated Korean name for known symbols; for anything else, try to
+// machine-translate Yahoo's (usually English) longName/shortName to Korean so
+// every listed stock shows a Korean name, not just our curated large-caps.
+async function resolveDisplayName(symbol, meta) {
   if (POPULAR_SET.has(symbol)) return nameForSymbol(symbol);
-  return meta?.longName || meta?.shortName || nameForSymbol(symbol);
+  const englishName = meta?.longName || meta?.shortName || symbol;
+  return translateToKorean(englishName);
 }
 
 // deterministic-ish seed from symbol string
@@ -164,6 +192,7 @@ function mockQuote(symbol) {
     change: Math.round((price - prevClose) * 100) / 100,
     changePercent: Math.round(changePct * 100) / 100,
     currency: symbol.endsWith('.KS') || symbol.endsWith('.KQ') ? 'KRW' : 'USD',
+    volume: Math.floor(rand() * 5000000),
     marketState: 'REGULAR',
     mock: true,
   };
@@ -275,16 +304,15 @@ router.get('/search', async (req, res) => {
   try {
     const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}`;
     const data = await fetchWithTimeout(url, 4000);
-    const results = (data.quotes || [])
-      .filter((item) => item.symbol)
-      .map((item) => ({
+    const rawResults = (data.quotes || []).filter((item) => item.symbol);
+    const results = await Promise.all(
+      rawResults.map(async (item) => ({
         symbol: item.symbol,
-        name: POPULAR_SET.has(item.symbol)
-          ? nameForSymbol(item.symbol)
-          : item.shortname || item.longname || item.symbol,
+        name: await resolveDisplayName(item.symbol, { longName: item.longname, shortName: item.shortname }),
         exchange: item.exchange,
         type: item.quoteType,
-      }));
+      }))
+    );
     const payload = { results, mock: false };
     setCache(cacheKey, payload);
     res.json(payload);
@@ -311,19 +339,21 @@ async function fetchScreener(scrId, count = 25) {
   const url = `https://query2.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&count=${count}&scrIds=${scrId}`;
   const data = await fetchWithTimeout(url, 4000);
   const quotes = data?.finance?.result?.[0]?.quotes || [];
-  return quotes
-    .filter((q) => q.symbol && q.regularMarketPrice != null)
-    .map((q) => ({
+  const filtered = quotes.filter((q) => q.symbol && q.regularMarketPrice != null);
+  return Promise.all(
+    filtered.map(async (q) => ({
       symbol: q.symbol,
-      name: resolveDisplayName(q.symbol, { longName: q.longName, shortName: q.shortName }),
+      name: await resolveDisplayName(q.symbol, { longName: q.longName, shortName: q.shortName }),
       price: round2(q.regularMarketPrice),
       prevClose: round2(q.regularMarketPreviousClose ?? q.regularMarketPrice - (q.regularMarketChange || 0)),
       change: round2(q.regularMarketChange ?? 0),
       changePercent: round2(q.regularMarketChangePercent ?? 0),
       currency: q.currency || 'USD',
+      volume: q.regularMarketVolume ?? null,
       marketState: q.marketState,
       mock: false,
-    }));
+    }))
+  );
 }
 
 router.get('/categories/:key', async (req, res) => {
@@ -338,14 +368,14 @@ router.get('/categories/:key', async (req, res) => {
 
   try {
     let items;
-    if (key === 'gainers' || key === 'losers') {
-      // Compute real-time gainers/losers dynamically across every symbol we
-      // track (not a hardcoded subset), and try to broaden with Yahoo's live
-      // market-wide screener on top of that.
+    if (key === 'gainers' || key === 'losers' || key === 'volume') {
+      // Compute real-time rankings dynamically across every symbol we track
+      // (not a hardcoded subset), and broaden with Yahoo's live market-wide
+      // screener on top of that, so this reflects actual market movers.
       const trackedQuotes = await Promise.all(ALL_TRACKED_SYMBOLS.map((symbol) => getQuote(symbol)));
       let combined = trackedQuotes;
       try {
-        const screenerId = key === 'gainers' ? 'day_gainers' : 'day_losers';
+        const screenerId = key === 'gainers' ? 'day_gainers' : key === 'losers' ? 'day_losers' : 'most_actives';
         const screenerQuotes = await fetchScreener(screenerId, 25);
         const seen = new Set(combined.map((q) => q.symbol));
         for (const q of screenerQuotes) {
@@ -357,14 +387,23 @@ router.get('/categories/:key', async (req, res) => {
       } catch (screenerErr) {
         // Screener endpoint can be blocked/rate-limited; fall back to tracked-only.
       }
-      items = combined
-        .filter((q) => Number.isFinite(q.changePercent))
-        .sort((a, b) => (key === 'gainers' ? b.changePercent - a.changePercent : a.changePercent - b.changePercent))
-        .slice(0, 20);
+      if (key === 'gainers' || key === 'losers') {
+        items = combined
+          .filter((q) => Number.isFinite(q.changePercent))
+          .sort((a, b) => (key === 'gainers' ? b.changePercent - a.changePercent : a.changePercent - b.changePercent))
+          .slice(0, 20);
+      } else {
+        // 거래대금(trading value) proxy = price * volume, since a true
+        // real-time KRX/NASDAQ trading-value feed isn't available for free.
+        items = combined
+          .filter((q) => Number.isFinite(q.volume) && q.volume > 0)
+          .sort((a, b) => b.price * b.volume - a.price * a.volume)
+          .slice(0, 20);
+      }
     } else {
       items = await Promise.all(symbols.map((symbol) => getQuote(symbol)));
     }
-    const payload = { key, items, realtime: key === 'gainers' || key === 'losers' };
+    const payload = { key, items, realtime: key === 'gainers' || key === 'losers' || key === 'volume' };
     setCache(cacheKey, payload);
     res.json(payload);
   } catch (err) {
@@ -391,12 +430,13 @@ router.get('/quote/:symbol', async (req, res) => {
     const changePercent = prevClose ? (change / prevClose) * 100 : 0;
     const payload = {
       symbol,
-      name: resolveDisplayName(symbol, meta),
+      name: await resolveDisplayName(symbol, meta),
       price: round2(price),
       prevClose: round2(prevClose),
       change: round2(change),
       changePercent: round2(changePercent),
       currency: meta.currency,
+      volume: meta.regularMarketVolume ?? null,
       marketState: meta.marketState,
       mock: false,
     };
@@ -466,12 +506,13 @@ async function getQuote(symbol) {
     const changePercent = prevClose ? (change / prevClose) * 100 : 0;
     const payload = {
       symbol,
-      name: resolveDisplayName(symbol, meta),
+      name: await resolveDisplayName(symbol, meta),
       price: round2(price),
       prevClose: round2(prevClose),
       change: round2(change),
       changePercent: round2(changePercent),
       currency: meta.currency,
+      volume: meta.regularMarketVolume ?? null,
       marketState: meta.marketState,
       mock: false,
     };

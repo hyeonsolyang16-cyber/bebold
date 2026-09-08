@@ -10,13 +10,13 @@ function easeInOutQuad(t) {
 // Turns sparse "real" points (e.g. one per second from the server) into a smooth,
 // continuously-flowing line by interpolating between the last two real points on
 // every animation tick, instead of jumping the chart every time new data arrives.
-export default function AssetTrendChart({ points, height = 64 }) {
+export default function AssetTrendChart({ points, height = 64, smooth = true }) {
   const [smoothPoints, setSmoothPoints] = useState([]);
   const rafRef = useRef(null);
   const bufferRef = useRef([]);
 
   useEffect(() => {
-    if (!points || points.length < 2) return undefined;
+    if (!smooth || !points || points.length < 2) return undefined;
 
     function tick() {
       const now = Date.now();
@@ -43,7 +43,7 @@ export default function AssetTrendChart({ points, height = 64 }) {
     return () => cancelAnimationFrame(rafRef.current);
   }, [points]);
 
-  const display = smoothPoints.length >= 2 ? smoothPoints : points;
+  const display = smooth && smoothPoints.length >= 2 ? smoothPoints : points;
   if (!display || display.length < 2) {
     return <div style={{ height }} />;
   }
