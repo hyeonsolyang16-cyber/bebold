@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const path = require('path');
 const fs = require('fs');
 
+const { initDb } = require('./db');
 const authRoutes = require('./routes/auth');
 const { router: stocksRoutes } = require('./routes/stocks');
 const tradesRoutes = require('./routes/trades');
@@ -37,7 +38,19 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: '서버 오류가 발생했습니다.' });
 });
 
-app.listen(PORT, () => {
-  console.log(`BeBold server listening on port ${PORT}`);
-  startOrderChecker();
-});
+async function start() {
+  try {
+    await initDb();
+    console.log('[BeBold] Database initialized (tables ensured).');
+  } catch (err) {
+    console.error('[BeBold] Failed to initialize database:', err);
+    process.exit(1);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`BeBold server listening on port ${PORT}`);
+    startOrderChecker();
+  });
+}
+
+start();

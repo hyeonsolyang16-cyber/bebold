@@ -1,14 +1,17 @@
 const express = require('express');
-const { db } = require('../db');
+const { pool } = require('../db');
 const { getQuote } = require('./stocks');
 
 const router = express.Router();
 
 router.get('/', async (req, res) => {
   try {
-    const users = db.prepare('SELECT * FROM users').all();
+    const usersRes = await pool.query('SELECT * FROM users');
+    const users = usersRes.rows;
+    const holdingsRes = await pool.query('SELECT * FROM holdings');
+    const allHoldings = holdingsRes.rows;
+
     const holdingsByUser = new Map();
-    const allHoldings = db.prepare('SELECT * FROM holdings').all();
     for (const h of allHoldings) {
       if (!holdingsByUser.has(h.user_id)) holdingsByUser.set(h.user_id, []);
       holdingsByUser.get(h.user_id).push(h);

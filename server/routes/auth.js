@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
-const { db, INITIAL_CAPITAL } = require('../db');
+const { pool, INITIAL_CAPITAL } = require('../db');
 const { JWT_SECRET } = require('../middleware/auth');
 
 const router = express.Router();
@@ -42,7 +42,7 @@ function passwordPolicyError(password) {
   return null;
 }
 
-router.post('/signup', authLimiter, (req, res) => {
+router.post('/signup', authLimiter, async (req, res) => {
   try {
     const { email, password, nickname } = req.body || {};
     if (!email || !password) {
@@ -52,18 +52,18 @@ router.post('/signup', authLimiter, (req, res) => {
     if (policyError) {
       return res.status(400).json({ error: policyError });
     }
-    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
-    if (existing) {
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows.length > 0) {
       return res.status(409).json({ error: '이미 가입된 이메일입니다.' });
     }
     const hash = bcrypt.hashSync(password, 10);
     const finalNickname = nickname && nickname.trim() ? nickname.trim() : email.split('@')[0];
-    const info = db
-      .prepare(
-        'INSERT INTO users (email, password_hash, nickname, cash, initial_capital) VALUES (?, ?, ?, ?, ?)'
-      )
-      .run(email, hash, finalNickname, INITIAL_CAPITAL, INITIAL_CAPITAL);
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid);
+    const inserted = await pool.query(
+      `INSERT INTO users (email, password_hash, nickname, cash, initial_capital)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [email, hash, finalNickname, INITIAL_CAPITAL, INITIAL_CAPITAL]
+    );
+    const user = inserted.rows[0];
     const token = issueToken(user);
     res.json({ token, user: publicUser(user) });
   } catch (err) {
@@ -72,13 +72,14 @@ router.post('/signup', authLimiter, (req, res) => {
   }
 });
 
-router.post('/login', authLimiter, (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body || {};
     if (!email || !password) {
       return res.status(400).json({ error: '이메일과 비밀번호를 입력해주세요.' });
     }
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const user = result.rows[0];
     if (!user) {
       return res.status(401).json({ error: '이메일 또는 비밀번호가 올바르지 않습니다.' });
     }
@@ -96,20 +97,22 @@ router.post('/login', authLimiter, (req, res) => {
       const attempts = (user.failed_attempts || 0) + 1;
       if (attempts >= MAX_FAILED_ATTEMPTS) {
         const lockedUntil = new Date(Date.now() + LOCK_MINUTES * 60 * 1000).toISOString();
-        db.prepare('UPDATE users SET failed_attempts = 0, locked_until = ? WHERE id = ?').run(
+        await pool.query('UPDATE users SET failed_attempts = 0, locked_until = $1 WHERE id = $2', [
           lockedUntil,
-          user.id
-        );
+          user.id,
+        ]);
         return res.status(423).json({
           error: `로그인 실패가 ${MAX_FAILED_ATTEMPTS}회 반복되어 계정이 ${LOCK_MINUTES}분간 잠겼습니다.`,
         });
       }
-      db.prepare('UPDATE users SET failed_attempts = ? WHERE id = ?').run(attempts, user.id);
+      await pool.query('UPDATE users SET failed_attempts = $1 WHERE id = $2', [attempts, user.id]);
       return res.status(401).json({ error: '이메일 또는 비밀번호가 올바르지 않습니다.' });
     }
 
     if (user.failed_attempts || user.locked_until) {
-      db.prepare('UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?').run(user.id);
+      await pool.query('UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = $1', [
+        user.id,
+      ]);
     }
 
     const token = issueToken(user);
@@ -123,13 +126,14 @@ router.post('/login', authLimiter, (req, res) => {
 // Demo-only password reset: no email service is configured, so the reset
 // link/token is returned directly in the API response and logged to the
 // server console instead of being emailed.
-router.post('/password-reset/request', authLimiter, (req, res) => {
+router.post('/password-reset/request', authLimiter, async (req, res) => {
   try {
     const { email } = req.body || {};
     if (!email) {
       return res.status(400).json({ error: '이메일을 입력해주세요.' });
     }
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const user = result.rows[0];
     // Always respond the same way whether or not the email exists, to avoid
     // leaking which emails are registered.
     if (!user) {
@@ -140,11 +144,11 @@ router.post('/password-reset/request', authLimiter, (req, res) => {
     }
     const token = crypto.randomBytes(24).toString('hex');
     const expires = new Date(Date.now() + RESET_TOKEN_MINUTES * 60 * 1000).toISOString();
-    db.prepare('UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?').run(
+    await pool.query('UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE id = $3', [
       token,
       expires,
-      user.id
-    );
+      user.id,
+    ]);
     console.log(`[BeBold] 비밀번호 재설정 토큰 (${email}): ${token} (30분 유효)`);
     res.json({
       ok: true,
@@ -157,7 +161,7 @@ router.post('/password-reset/request', authLimiter, (req, res) => {
   }
 });
 
-router.post('/password-reset/confirm', authLimiter, (req, res) => {
+router.post('/password-reset/confirm', authLimiter, async (req, res) => {
   try {
     const { email, token, newPassword } = req.body || {};
     if (!email || !token || !newPassword) {
@@ -167,7 +171,8 @@ router.post('/password-reset/confirm', authLimiter, (req, res) => {
     if (policyError) {
       return res.status(400).json({ error: policyError });
     }
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const user = result.rows[0];
     if (!user || !user.reset_token || user.reset_token !== token) {
       return res.status(400).json({ error: '토큰이 유효하지 않습니다.' });
     }
@@ -175,9 +180,11 @@ router.post('/password-reset/confirm', authLimiter, (req, res) => {
       return res.status(400).json({ error: '토큰이 만료되었습니다. 다시 요청해주세요.' });
     }
     const hash = bcrypt.hashSync(newPassword, 10);
-    db.prepare(
-      'UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL, failed_attempts = 0, locked_until = NULL WHERE id = ?'
-    ).run(hash, user.id);
+    await pool.query(
+      `UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expires = NULL,
+       failed_attempts = 0, locked_until = NULL WHERE id = $2`,
+      [hash, user.id]
+    );
     res.json({ ok: true, message: '비밀번호가 재설정되었습니다.' });
   } catch (err) {
     console.error(err);

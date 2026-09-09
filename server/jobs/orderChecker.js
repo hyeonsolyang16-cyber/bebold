@@ -6,7 +6,7 @@ const CHECK_INTERVAL_MS = 20 * 1000; // 20s
 async function checkPendingOrders() {
   let orders;
   try {
-    orders = getAllPendingOrders();
+    orders = await getAllPendingOrders();
   } catch (err) {
     console.error('[orderChecker] failed to load pending orders', err);
     return;
@@ -32,10 +32,10 @@ async function checkPendingOrders() {
     const price = quote.price;
     try {
       if (order.side === 'BUY' && price <= order.limit_price) {
-        fillBuyOrderTxn(order, price);
+        await fillBuyOrderTxn(order, price);
         console.log(`[orderChecker] filled BUY order #${order.id} ${order.symbol} @ ${price}`);
       } else if (order.side === 'SELL' && price >= order.limit_price) {
-        fillSellOrderTxn(order, price);
+        await fillSellOrderTxn(order, price);
         console.log(`[orderChecker] filled SELL order #${order.id} ${order.symbol} @ ${price}`);
       }
     } catch (err) {
