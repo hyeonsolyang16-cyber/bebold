@@ -14,6 +14,10 @@ const { startOrderChecker } = require('./jobs/orderChecker');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// Render sits behind a reverse proxy that sets X-Forwarded-For; without this,
+// express-rate-limit throws on every request instead of rate-limiting.
+app.set('trust proxy', 1);
+
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(express.json());
