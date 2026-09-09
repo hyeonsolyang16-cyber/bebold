@@ -61,7 +61,7 @@ export default function Signup() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="4자 이상"
+            placeholder="영문+숫자 포함 8자 이상"
             required
           />
         </div>

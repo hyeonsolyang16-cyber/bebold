@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const path = require('path');
 const fs = require('fs');
 
@@ -12,6 +13,7 @@ const { startOrderChecker } = require('./jobs/orderChecker');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(express.json());
 

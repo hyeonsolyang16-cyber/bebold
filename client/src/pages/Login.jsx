@@ -63,6 +63,9 @@ export default function Login() {
       <div style={{ textAlign: 'center', marginTop: 16 }} className="muted">
         계정이 없으신가요? <Link to="/signup" style={{ color: 'var(--primary)', fontWeight: 700 }}>회원가입</Link>
       </div>
+      <div style={{ textAlign: 'center', marginTop: 8 }} className="muted">
+        <Link to="/forgot-password" style={{ color: 'var(--text-muted)' }}>비밀번호를 잊으셨나요?</Link>
+      </div>
     </div>
   );
 }

@@ -16,6 +16,10 @@ CREATE TABLE IF NOT EXISTS users (
   nickname TEXT NOT NULL,
   cash REAL NOT NULL DEFAULT ${INITIAL_CAPITAL},
   initial_capital REAL NOT NULL DEFAULT ${INITIAL_CAPITAL},
+  failed_attempts INTEGER NOT NULL DEFAULT 0,
+  locked_until TEXT,
+  reset_token TEXT,
+  reset_token_expires TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -64,6 +68,21 @@ CREATE TABLE IF NOT EXISTS pending_orders (
 const pendingOrderCols = db.prepare('PRAGMA table_info(pending_orders)').all().map((c) => c.name);
 if (!pendingOrderCols.includes('avg_price_at_order')) {
   db.exec('ALTER TABLE pending_orders ADD COLUMN avg_price_at_order REAL');
+}
+
+// Lightweight migration for DBs created before the account-security columns existed.
+const userCols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
+if (!userCols.includes('failed_attempts')) {
+  db.exec('ALTER TABLE users ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0');
+}
+if (!userCols.includes('locked_until')) {
+  db.exec('ALTER TABLE users ADD COLUMN locked_until TEXT');
+}
+if (!userCols.includes('reset_token')) {
+  db.exec('ALTER TABLE users ADD COLUMN reset_token TEXT');
+}
+if (!userCols.includes('reset_token_expires')) {
+  db.exec('ALTER TABLE users ADD COLUMN reset_token_expires TEXT');
 }
 
 module.exports = { db, INITIAL_CAPITAL };

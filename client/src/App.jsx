@@ -4,6 +4,7 @@ import BottomTabBar from './components/BottomTabBar.jsx';
 import InstallPrompt from './components/InstallPrompt.jsx';
 import Login from './pages/Login.jsx';
 import Signup from './pages/Signup.jsx';
+import ForgotPassword from './pages/ForgotPassword.jsx';
 import Home from './pages/Home.jsx';
 import Search from './pages/Search.jsx';
 import StockDetail from './pages/StockDetail.jsx';
@@ -41,6 +42,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route
               path="/"
               element={
