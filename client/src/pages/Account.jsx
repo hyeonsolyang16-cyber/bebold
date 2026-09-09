@@ -72,24 +72,22 @@ export default function Account() {
     <div>
       <div className="page-title">내 계좌</div>
 
-      <div className="summary-card">
-        <div className="label">{user?.nickname}님의 총 자산</div>
-        <div className="total">{Math.round(totalAssets).toLocaleString()}원</div>
-        <div className="stats">
-          <div>
-            수익률
-            <span className="value">
-              {returnPct >= 0 ? '+' : ''}
-              {returnPct.toFixed(2)}%
-            </span>
+      <div className="asset-card">
+        <div className="asset-card-top">
+          <div className="asset-label">{user?.nickname}님의 총 자산</div>
+        </div>
+        <div className="asset-total">{Math.round(totalAssets).toLocaleString()}원</div>
+        <div className={`asset-change-pill ${returnPct >= 0 ? 'up' : 'down'}`}>
+          {returnPct >= 0 ? '▲' : '▼'} {Math.abs(returnPct).toFixed(2)}%
+        </div>
+        <div className="asset-card-footer">
+          <div className="asset-footer-item">
+            <span className="asset-footer-label">보유현금</span>
+            <span className="asset-footer-value">{Math.round(cash).toLocaleString()}원</span>
           </div>
-          <div>
-            현금
-            <span className="value">{Math.round(cash).toLocaleString()}원</span>
-          </div>
-          <div>
-            주식평가금
-            <span className="value">{Math.round(holdingsValue).toLocaleString()}원</span>
+          <div className="asset-footer-item">
+            <span className="asset-footer-label">주식평가금</span>
+            <span className="asset-footer-value">{Math.round(holdingsValue).toLocaleString()}원</span>
           </div>
         </div>
       </div>
